@@ -1,3 +1,5 @@
+
+
 # SP1 Starknet Template
 
 [![Build Status](https://github.com/feltroidprime/sp1-starknet-template/workflows/Build%20Program/badge.svg)](https://github.com/feltroidprime/sp1-starknet-template/actions)
@@ -41,7 +43,7 @@ This template demonstrates how to create an end-to-end [SP1](https://github.com/
 2. **Install SP1**
    ```bash
    curl -L https://sp1.succinct.xyz | bash
-   sp1up
+   ~/.sp1/bin/sp1up
    ```
 
 3. **Install Starknet toolchain**
