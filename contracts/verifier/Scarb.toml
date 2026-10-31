@@ -1,0 +1,19 @@
+[package]
+name = "sp1_verifier_bn254"
+version = "0.1.0"
+edition = "2024_07"
+
+[lib]
+
+[dependencies]
+garaga = { git = "https://github.com/keep-starknet-strange/garaga.git", rev = "db69575e8c78d4a1b76e06cbbb00ccd66fbdb1b5" }
+starknet = "2.21.0"
+
+[cairo]
+sierra-replace-ids = false
+inlining-strategy = 2
+
+[[target.starknet-contract]]
+casm = true
+casm-add-pythonic-hints = true
+build-external-contracts = ["garaga::universal_ecip::UniversalECIP"]

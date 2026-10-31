@@ -1,3 +1,4 @@
 [toolchain]
-channel = "stable"
-components = ["llvm-tools", "rustc-dev"]
+channel = "1.91.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

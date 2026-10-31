@@ -1,29 +1,24 @@
 {
     "rust-analyzer.linkedProjects": [
-        "program/Cargo.toml",
-        "script/Cargo.toml"
+        "Cargo.toml"
     ],
     "rust-analyzer.check.overrideCommand": [
         "cargo",
         "clippy",
+        "--locked",
         "--workspace",
+        "--exclude",
+        "fibonacci-program",
         "--message-format=json",
         "--all-features",
-        "--all-targets",
-        "--",
-        "-A",
-        "incomplete-features"
+        "--all-targets"
     ],
     "rust-analyzer.runnables.extraEnv": {
-        "RUST_LOG": "debug",
-        "RUSTFLAGS": "-Ctarget-cpu=native"
+        "RUST_LOG": "info"
     },
     "rust-analyzer.runnables.extraArgs": [
         "--release",
-        "+nightly"
-    ],
-    "rust-analyzer.diagnostics.disabled": [
-        "unresolved-proc-macro"
+        "--locked"
     ],
     "editor.rulers": [
         100
@@ -33,5 +28,5 @@
         "editor.defaultFormatter": "rust-lang.rust-analyzer",
         "editor.formatOnSave": true,
         "editor.hover.enabled": true
-    },
+    }
 }

@@ -1,43 +1,31 @@
-name: Build Program
-
+name: SP1 receipt and guest
 on:
-  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
-
-env:
-  FOUNDRY_PROFILE: ci
-
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   check:
-    strategy:
-      fail-fast: true
-
-    name: Build and Execute
-    runs-on: ubuntu-latest
+    name: Receipt and guest
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_BUILD_JOBS: 4
+      SP1_PROVER: cpu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@1.91.1
         with:
-          submodules: recursive
-
-      - name: Install rust toolchain
-        uses: actions-rs/toolchain@v1
+          components: rustfmt, clippy
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: Swatinem/rust-cache@v2.9.3
         with:
-          profile: minimal
-          toolchain: 1.85.0
-
-      - name: Install SP1 toolchain
-        run: |
-          curl -L https://sp1.succinct.xyz | bash
-          ~/.sp1/bin/sp1up 
-          ~/.sp1/bin/cargo-prove prove --version
-
-      - name: Build SP1 program
-        run: |
-          cd program
-          ~/.sp1/bin/cargo-prove prove build
-
-      - name: Execute SP1 program
-        run: |
-          cargo run --release -- --execute
+          prefix-key: sp1-ci-v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Guest execution, key binding, SDK receipt, and Garaga calldata
+        run: cargo test --profile ci --locked -p fibonacci-lib -p fibonacci-script --lib -- --nocapture
+      - name: Clippy and optional network client without credentials
+        run: cargo clippy --profile ci --locked --workspace --exclude fibonacci-program --all-features --all-targets

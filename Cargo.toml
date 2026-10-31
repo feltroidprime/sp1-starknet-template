@@ -8,3 +8,9 @@ resolver = "2"
 
 [workspace.dependencies]
 alloy-sol-types = "1.0"
+
+# Le guest reste compilé en release dans son image Docker; ce profil réduit seulement le coût host.
+[profile.ci]
+inherits = "release"
+opt-level = 1
+codegen-units = 256

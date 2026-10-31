@@ -1,269 +1,93 @@
-# SP1 Starknet Verification Contracts
+# Contract verification
 
-> **📖 For project overview and quick start, see the [main README](../README.md)**
-> 
-> **⚙️ For proof generation, see the [script documentation](../script/README.md)**
+`HelloStarknet` calls the Garaga SP1 v6 verifier through a library call.
+The constructor fixes its verifier class hash and program verification key.
+There are no methods that change these values.
 
-This directory contains Cairo smart contracts for verifying [SP1](https://github.com/succinctlabs/sp1) zero-knowledge proofs on Starknet using the Garaga SP1 Verifier.
+The entry point returns `Ok(public_values)` after proof verification and the program-key comparison.
+It returns `Err(error)` for the verifier's explicit validation errors.
+Malformed proofs and failed pairing checks can revert.
+The public values contain `(n, F(n), F(n+1))` as `u256` words.
 
-## 🏗️ Architecture
+## Offline tests
 
-The verification system consists of:
-
-- **SP1 Verifier Contract**: Deployed by Garaga library (external dependency)
-- **HelloStarknet Contract**: Your application contract that verifies SP1 proofs
-- **Test Suite**: Comprehensive tests using real proof fixtures
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SP1 Proof     │───▶│ HelloStarknet   │───▶│ Garaga Verifier │
-│   (Groth16)     │    │   Contract      │    │   (Library)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-## 🚀 Quick Setup
-
-> **Prerequisites**: See [main README prerequisites](../README.md#prerequisites)
+Use Scarb 2.21.0 and Starknet Foundry 0.64.1.
 
 ```bash
-# Build the contracts
-scarb build
-
-# Run tests (requires proof fixtures)
+cd contracts
 snforge test
 ```
 
-For complete setup including proof generation, see the [main README workflow](../README.md#quick-test-workflow).
+The tests declare `UniversalECIP` and `SP1Groth16VerifierBN254` locally.
+They do not fork Mainnet or Sepolia.
+They verify the stored Fibonacci receipt and its exact public values.
+They also reject another program key, a failed guest, a wrong recursion root, and a changed nonce.
 
-## 📁 Project Structure
+`verifier/src/groth16_verifier.cairo` is an unmodified copy from the pinned Garaga commit.
+The standalone package retains the upstream package name, module path, and compiler options.
+The Git resolver does not expose this generated package directly.
+The integration check compares its source with upstream.
+The devnet check also compares both compiled class hashes with `integration.json`.
 
-```
-contracts/
-├── src/
-│   ├── lib.cairo              # Main verification contract
-│   └── fixtures/              # Test fixtures and proof data
-│       ├── groth16-fixture.json    # Complete proof fixture
-│       └── groth16-calldata.txt    # Formatted calldata
-├── tests/
-│   └── test_contract.cairo    # Contract verification tests
-├── Scarb.toml                 # Cairo project configuration
-└── snfoundry.toml            # Starknet Foundry configuration
-```
+## Isolated devnet
 
-## 🔧 Configuration
-
-### Step 1: Update SP1 Verifier Class Hash
-
-The contract uses the Garaga-maintained SP1 Verifier. Check [Starknet SP1 Verifier](https://garaga.gitbook.io/garaga/maintained-smart-contracts) for the latest version.
-
-Update in `src/lib.cairo`:
-```rust
-const SP1_VERIFIER_CLASS_HASH: felt252 = 0x5d147e9fcb648e847da819287b8f462ce9416419240c64d35640dcba35e127;
-```
-
-### Step 2: Set Your Program Verification Key
-
-1. **Generate your verification key** (see [script documentation](../script/README.md#3-verification-key-script-vkeyrs)):
-   ```bash
-   cd ../script
-   cargo run --release --bin vkey
-   ```
-   
-   Output example: `0x00ee2a4a1c9c659ed802a544aa469136e72e1a1538af94fce56705576b48f247`
-
-2. **Update the contract**:
-   ```rust
-   const SP1_PROGRAM: u256 = 0x00ee2a4a1c9c659ed802a544aa469136e72e1a1538af94fce56705576b48f247;
-   ```
-
-### Step 3: Generate Proof Fixtures
-
-> **For detailed proof generation instructions, see [script/README.md](../script/README.md#2-starknet-script-starknetrs)**
+Install starknet-devnet 0.10.1 and `uv`.
+Add the devnet binary, Scarb, and Foundry to `PATH`.
+Run this command from the repository root:
 
 ```bash
-cd ../script
-cargo run --release --bin starknet -- --system groth16
+uv run --locked scripts/devnet.py
 ```
 
-This creates test fixtures in `src/fixtures/`:
-- `groth16-fixture.json`: Complete proof data with metadata
-- `groth16-calldata.txt`: Formatted calldata for contract calls
+The script compiles the release artifacts and checks both verifier hashes.
+It starts its own devnet on a local port, declares all classes, and deploys the application.
+It then verifies the stored receipt through the deployed application and checks the exact outputs.
+The script stops the devnet after completion.
+It accepts no remote RPC URL or private key.
 
-### Step 4: Verify Everything Works
+## Live network prerequisites
+
+On October 31, 2026, RPC reads found these classes absent from both Mainnet and Sepolia:
+
+- SP1 v6: `0x02f5bde36cc36fe00ca97d181dd3c1a26bb92076818d2304c329488608e0db1f`.
+- UniversalECIP: `0x20dc39fc30f4d62db17cc86a911f1f27135d255357ce99d3b40e2da78f800dd`.
+
+The providers returned error 28, `Class hash not found`.
+Older known classes existed on the same providers.
+The reads used Mainnet block 17232846 and Sepolia block 17433642.
+Explicit declarations of both classes are necessary before deployment.
+The Garaga release pipeline checks availability but does not submit these declarations.
+The published older classes cannot verify this receipt.
+
+After explicit authorization for live transactions, an operator can declare the release artifacts.
+Build and inspect them first:
 
 ```bash
-snforge test
+scarb --manifest-path contracts/verifier/Scarb.toml --release build
+scarb --manifest-path contracts/Scarb.toml --release build
+sncast utils class-hash --sierra-file contracts/verifier/target/release/sp1_verifier_bn254_UniversalECIP.contract_class.json
+sncast utils class-hash --sierra-file contracts/verifier/target/release/sp1_verifier_bn254_SP1Groth16VerifierBN254.contract_class.json
 ```
 
-## 🧪 Contract Interface
-
-### `IHelloStarknet`
-
-The main contract interface for SP1 proof verification:
-
-```rust
-#[starknet::interface]
-pub trait IHelloStarknet<TContractState> {
-    /// Verify an SP1 proof against the expected program
-    /// 
-    /// # Arguments
-    /// * `proof` - Array of felt252 values representing the Groth16 proof
-    /// 
-    /// # Returns
-    /// * `Option<Span<u256>>` - Some(public_inputs) if valid, None if invalid
-    fn verify_sp1_proof(ref self: TContractState, proof: Array<felt252>) -> Option<Span<u256>>;
-}
-```
-
-### Verification Process
-
-The contract performs the following verification steps:
-
-1. **Proof Verification**: Calls the Garaga SP1 Verifier to validate the Groth16 proof
-2. **Program Verification**: Ensures the proof corresponds to the expected SP1 program
-3. **Public Input Extraction**: Returns the public inputs if verification succeeds
-
-```rust
-fn verify_sp1_proof(ref self: ContractState, proof: Array<felt252>) -> Option<Span<u256>> {
-    // Call Garaga verifier
-    let result = library_call_syscall(
-        SP1_VERIFIER_CLASS_HASH.try_into().unwrap(),
-        selector!("verify_sp1_groth16_proof_bn254"),
-        proof.span(),
-    ).unwrap_syscall();
-
-    // Deserialize result
-    let result = Serde::<Option<(u256, Span<u256>)>>::deserialize(ref result_serialized).unwrap();
-
-    if result.is_none() {
-        return None;
-    }
-    
-    let (vk, public_inputs) = result.unwrap();
-    
-    // Verify this proof is for our expected program
-    assert(vk == SP1_PROGRAM, 'Wrong program');
-    
-    Some(public_inputs)
-}
-```
-
-## 🧪 Testing
-
-### Test Structure
-
-The test suite uses Starknet Foundry with fork testing to verify proofs against the actual Garaga verifier on Sepolia testnet.
-
-```rust
-#[test]
-#[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_8", block_tag: latest)]
-fn test_verify_sp1_proof() {
-    // Deploy contract
-    let contract_address = deploy_contract("HelloStarknet");
-    let dispatcher = IHelloStarknetDispatcher { contract_address };
-    
-    // Load proof fixture
-    let file = FileTrait::new("src/fixtures/groth16-calldata.txt");
-    let calldata = read_txt(@file);
-    
-    // Verify proof
-    let result = dispatcher.verify_sp1_proof(calldata);
-    assert(result.is_some(), 'Proof is invalid');
-}
-```
-
-### Running Tests
+Configure a separate sncast account and RPC for the intended chain.
+From `contracts/verifier`, estimate the declarations before submission:
 
 ```bash
-# Run all tests
-snforge test
-
-# Run tests with gas reporting
-snforge test --detailed-resources
+sncast --account "$ACCOUNT" --scarb-profile release declare --contract-name UniversalECIP --url "$RPC_URL" --dry-run
+sncast --account "$ACCOUNT" --scarb-profile release declare --contract-name SP1Groth16VerifierBN254 --url "$RPC_URL" --dry-run
 ```
 
-### Test Requirements
-
-Tests require valid proof fixtures. Generate them using:
+After approval, submit the declarations in this order:
 
 ```bash
-cd ../script
-cargo run --release --bin starknet -- --system groth16 --n 10
-cd ../contracts
-snforge test
+sncast --account "$ACCOUNT" --scarb-profile release --wait declare --contract-name UniversalECIP --url "$RPC_URL"
+sncast --account "$ACCOUNT" --scarb-profile release --wait declare --contract-name SP1Groth16VerifierBN254 --url "$RPC_URL"
 ```
 
-## 🔗 Integration Guide
-
-### Using in Your Application
-
-1. **Import the interface**:
-   ```rust
-   use your_contract::{IHelloStarknetDispatcher, IHelloStarknetDispatcherTrait};
-   ```
-
-2. **Call verification**:
-   ```rust
-   let dispatcher = IHelloStarknetDispatcher { contract_address };
-   let result = dispatcher.verify_sp1_proof(proof_calldata);
-   
-   match result {
-       Option::Some(public_inputs) => {
-           // Proof is valid, use public_inputs
-           handle_valid_proof(public_inputs);
-       },
-       Option::None => {
-           // Proof is invalid
-           handle_invalid_proof();
-       }
-   }
-   ```
-
-### Calldata Generation
-
-> **For proof generation details, see [script/README.md](../script/README.md#integration)**
-
-Use the script utilities to generate properly formatted calldata:
-
-```rust
-// In your Rust application
-use script::get_sp1_garaga_starknet_calldata;
-let calldata:Vec<BigUint> = get_sp1_garaga_starknet_calldata(&proof, &vk);
-```
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **"Wrong program" error**
-   - Regenerate verification key: `cd ../script && cargo run --release --bin vkey`
-   - Update contract with new key in [Step 2](#step-2-set-your-program-verification-key)
-   - Regenerate proofs: `cargo run --release --bin starknet`
-
-2. **Test failures**
-   - Ensure proof fixtures exist: check `src/fixtures/` directory
-   - Regenerate fixtures: `cd ../script && cargo run --release --bin starknet`
-   - Verify contract configuration matches generated proofs
-
-3. **Fork test issues**
-   - Check [Starknet RPC providers](https://www.starknet.io/full-nodes-rpc-services/)
-   - Check [Fork Testing documentation](https://foundry-rs.github.io/starknet-foundry/snforge-advanced-features/fork-testing.html)
-   - Verify Garaga verifier is deployed on current Sepolia
-   - Update `SP1_VERIFIER_CLASS_HASH` if needed
-
-
-## 📚 Resources
-
-- [Garaga Documentation](https://garaga.gitbook.io/garaga/)
-- [Garaga SP1 Verifier Contracts](https://garaga.gitbook.io/garaga/maintained-smart-contracts)
-- [Starknet Foundry](https://foundry-rs.github.io/starknet-foundry/)
-- [Cairo Book](https://book.cairo-lang.org/)
-- [Starknet Documentation](https://docs.starknet.io/)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE-MIT](../LICENSE-MIT) file for details.
-
----
-
-**Need help?** Check the [main project README](../README.md) or [troubleshooting section](../README.md#troubleshooting).
+These commands use the configured sncast account file.
+`ACCOUNT` identifies the approved account, and `RPC_URL` identifies the approved chain.
+Declare and deploy `HelloStarknet` with the SP1 class hash and the key from `cargo run --release --locked --bin vkey`.
+The calldata file contains the array elements without the outer ABI length.
+Serialize this array for `verify_sp1_proof`; the devnet script shows the exact payload.
+Live declarations and deployment spend funds.
+Neither CI nor the devnet script performs these transactions.
