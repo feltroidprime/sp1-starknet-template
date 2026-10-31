@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 pub const GNARK_IMAGE: &str = "ghcr.io/succinctlabs/sp1-gnark@sha256:fd3e39f4995735567932b145580c70f87552dec0181f14a6898451a7ec5fa409";
 
+#[cfg(feature = "prover")]
 pub fn prepare_local_prover() {
     // Ces ressources doivent être disponibles avant le calcul coûteux du reçu wrap.
     let present = std::process::Command::new("docker")
@@ -86,3 +87,6 @@ pub fn write_fixture(fixture: &Fixture) {
     .unwrap();
     std::fs::write(path.join("groth16-calldata.txt"), fixture.calldata()).unwrap();
 }
+
+#[cfg(test)]
+mod receipt_tests;

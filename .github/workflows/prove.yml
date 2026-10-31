@@ -21,11 +21,11 @@ jobs:
       - name: Install protobuf compiler
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          prefix-key: sp1-ci-v2
       - name: Format
         run: cargo fmt --all -- --check
-      - name: Guest, key binding, SDK receipt, and Garaga calldata
-        run: cargo test --release --locked --workspace --exclude fibonacci-program
-      - name: Execute guest
-        run: cargo run --release --locked --bin fibonacci -- --execute --n 10
+      - name: Guest execution, key binding, SDK receipt, and Garaga calldata
+        run: cargo test --profile ci --locked -p fibonacci-lib -p fibonacci-script --lib -- --nocapture
       - name: Clippy and optional network client without credentials
-        run: cargo clippy --release --locked --workspace --exclude fibonacci-program --all-features --all-targets
+        run: cargo clippy --profile ci --locked --workspace --exclude fibonacci-program --all-features --all-targets

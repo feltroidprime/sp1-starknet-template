@@ -1,9 +1,9 @@
+use crate::{fixtures_dir, Fixture};
 use alloy_sol_types::SolType;
 use fibonacci_lib::{fibonacci, PublicValuesStruct};
-use fibonacci_script::{fixtures_dir, Fixture};
 use sha2::{Digest, Sha256};
 use sp1_sdk::blocking::{Prover, ProverClient};
-use sp1_sdk::{include_elf, HashableKey, ProvingKey};
+use sp1_sdk::{include_elf, HashableKey, ProvingKey, SP1Stdin};
 
 fn fixture() -> Fixture {
     serde_json::from_str(
@@ -84,4 +84,22 @@ fn sdk_rejects_modified_receipt_and_public_values() {
         &sp1_verifier::GROTH16_VK_BYTES
     )
     .is_err());
+}
+
+#[test]
+fn guest_execution_matches_fibonacci() {
+    let client = ProverClient::builder().light().build();
+    let mut stdin = SP1Stdin::new();
+    stdin.write(&10_u32);
+    let (output, report) = client
+        .execute(include_elf!("fibonacci-program"), stdin)
+        .run()
+        .unwrap();
+    let values = PublicValuesStruct::abi_decode(output.as_slice()).unwrap();
+    assert_eq!((values.n, values.a, values.b), (10, 55, 89));
+    assert_eq!(report.exit_code, 0);
+    println!(
+        "Guest executed: n=10, F(n)=55, F(n+1)=89, cycles={}",
+        report.total_instruction_count()
+    );
 }

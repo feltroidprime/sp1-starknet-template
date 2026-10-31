@@ -1,8 +1,12 @@
 use alloy_sol_types::SolType;
 use clap::Parser;
 use fibonacci_lib::{fibonacci, PublicValuesStruct};
-use sp1_sdk::blocking::{ProveRequest, Prover, ProverClient};
-use sp1_sdk::{include_elf, Elf, ProvingKey, SP1Stdin};
+#[cfg(feature = "prover")]
+use sp1_sdk::blocking::ProveRequest;
+use sp1_sdk::blocking::{Prover, ProverClient};
+#[cfg(feature = "prover")]
+use sp1_sdk::ProvingKey;
+use sp1_sdk::{include_elf, Elf, SP1Stdin};
 
 const ELF: Elf = include_elf!("fibonacci-program");
 
@@ -35,15 +39,20 @@ fn main() {
             report.total_instruction_count()
         );
     } else {
-        let client = ProverClient::from_env();
-        let pk = client.setup(ELF).unwrap();
-        let proof = client
-            .prove(&pk, stdin)
-            .run()
-            .expect("core proof generation failed");
-        client
-            .verify(&proof, pk.verifying_key(), None)
-            .expect("core proof verification failed");
-        println!("Core proof verified. Use --bin starknet for a Groth16 receipt.");
+        #[cfg(not(feature = "prover"))]
+        panic!("Core proof generation requires --features prover");
+        #[cfg(feature = "prover")]
+        {
+            let client = ProverClient::from_env();
+            let pk = client.setup(ELF).unwrap();
+            let proof = client
+                .prove(&pk, stdin)
+                .run()
+                .expect("core proof generation failed");
+            client
+                .verify(&proof, pk.verifying_key(), None)
+                .expect("core proof verification failed");
+            println!("Core proof verified. Use --bin starknet for a Groth16 receipt.");
+        }
     }
 }

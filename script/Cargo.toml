@@ -12,6 +12,7 @@ path = "src/bin/main.rs"
 [[bin]]
 name = "starknet"
 path = "src/bin/starknet.rs"
+required-features = ["prover"]
 
 [[bin]]
 name = "calldata"
@@ -32,7 +33,7 @@ sha2 = "0.10"
 alloy-sol-types = { workspace = true }
 fibonacci-lib = { path = "../lib" }
 dotenv = "0.15.0"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 [build-dependencies]
 sp1-build = "=6.10.0"
@@ -41,4 +42,5 @@ sp1-build = "=6.10.0"
 sp1-verifier = { version = "=6.10.0", default-features = false }
 
 [features]
-network = ["sp1-sdk/network"]
+prover = ["dep:tokio"]
+network = ["prover", "sp1-sdk/network"]

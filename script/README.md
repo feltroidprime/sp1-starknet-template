@@ -16,7 +16,7 @@ The second command prints the program verification key for the application const
 This command downloads the roughly 6.2 GB parameter archive and the pinned Groth16 image:
 
 ```bash
-cargo run --release --locked --bin starknet -- --prepare-only
+cargo run --release --locked --features prover --bin starknet -- --prepare-only
 ```
 
 It does not generate a proof.
@@ -25,12 +25,17 @@ Network generation does not need these local resources.
 
 ## Proof generation
 
+The optional `prover` feature enables proof-generation commands.
+The `network` feature also enables `prover`.
+The default tests compile library targets and execute the guest without linking the generation binaries.
+
+
 This command generates and verifies one real Groth16 receipt.
 It then replaces `contracts/src/fixtures/groth16-fixture.json` and `groth16-calldata.txt`.
 Docker must run for the default Groth16 backend.
 
 ```bash
-SP1_PROVER=cpu cargo run --release --locked --bin starknet -- --n 3
+SP1_PROVER=cpu cargo run --release --locked --features prover --bin starknet -- --n 3
 ```
 
 SP1 SDK 6.10.0 uses circuit v6.1.0.
@@ -52,7 +57,7 @@ cargo run --release --locked --features network --bin starknet -- --n 3
 ## Receipt verification
 
 ```bash
-cargo test --release --locked --workspace --exclude fibonacci-program
+cargo test --profile ci --locked -p fibonacci-lib -p fibonacci-script --lib
 ```
 
 The tests compile the guest and compare its key with the committed receipt.

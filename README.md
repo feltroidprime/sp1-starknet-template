@@ -40,7 +40,7 @@ They do not generate a proof or require a public Starknet RPC endpoint.
 The first run downloads compiler dependencies and the guest build image.
 
 ```bash
-cargo test --release --locked --workspace --exclude fibonacci-program
+cargo test --profile ci --locked -p fibonacci-lib -p fibonacci-script --lib
 cargo run --release --locked --bin fibonacci -- --execute --n 10
 uv run --no-project python scripts/check-integration.py
 cd contracts
@@ -52,6 +52,9 @@ It compares this key with the stored receipt and verifies the receipt with the o
 It also checks the public outputs, Garaga calldata, and rejection of altered receipts.
 The Cairo tests declare both verifier classes locally and exercise the application contract.
 CI runs these checks without repeated proof generation.
+The `ci` profile reduces host compilation work; the guest still uses the pinned Docker release build.
+Receipt verification and guest execution share one library test binary.
+Proof generation requires the optional `prover` feature; CI type-checks that feature through Clippy.
 
 ## Generate a new receipt
 
@@ -61,8 +64,8 @@ The first local proof also needs a roughly 6.2 GB parameter archive, plus space 
 The generator prepares these parameters before it starts the expensive computation.
 
 ```bash
-SP1_PROVER=cpu cargo run --release --locked --bin starknet -- --n 3
-cargo test --release --locked --workspace --exclude fibonacci-program
+SP1_PROVER=cpu cargo run --release --locked --features prover --bin starknet -- --n 3
+cargo test --profile ci --locked -p fibonacci-lib -p fibonacci-script --lib
 (cd contracts && snforge test)
 ```
 
