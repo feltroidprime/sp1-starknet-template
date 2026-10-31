@@ -2,6 +2,7 @@
 version = "0.1.0"
 name = "fibonacci-script"
 edition = "2021"
+rust-version = "1.91.1"
 default-run = "fibonacci"
 
 [[bin]]
@@ -13,22 +14,31 @@ name = "starknet"
 path = "src/bin/starknet.rs"
 
 [[bin]]
+name = "calldata"
+path = "src/bin/calldata.rs"
+
+[[bin]]
 name = "vkey"
 path = "src/bin/vkey.rs"
 
 [dependencies]
-sp1-sdk = "4.2.0"
-garaga_rs = { git = "https://github.com/keep-starknet-strange/garaga.git", tag = "v0.18.1" }
-num-bigint = "0.4.0"
+sp1-sdk = { version = "=6.10.0", features = ["blocking"] }
+garaga_rs = { git = "https://github.com/keep-starknet-strange/garaga.git", rev = "db69575e8c78d4a1b76e06cbbb00ccd66fbdb1b5", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde = { version = "1.0.200", default-features = false, features = ["derive"] }
 clap = { version = "4.0", features = ["derive", "env"] }
-tracing = "0.1.40"
 hex = "0.4.3"
+sha2 = "0.10"
 alloy-sol-types = { workspace = true }
 fibonacci-lib = { path = "../lib" }
 dotenv = "0.15.0"
-
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [build-dependencies]
-sp1-build = "4.2.0"
+sp1-build = "=6.10.0"
+
+[dev-dependencies]
+sp1-verifier = { version = "=6.10.0", default-features = false }
+
+[features]
+network = ["sp1-sdk/network"]

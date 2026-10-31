@@ -1,174 +1,112 @@
 # SP1 Starknet Template
 
-[![Build Status](https://github.com/feltroidprime/sp1-starknet-template/workflows/Build%20Program/badge.svg)](https://github.com/feltroidprime/sp1-starknet-template/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+This template proves a Fibonacci computation with SP1 and verifies the receipt on Starknet through Garaga.
+The guest commits `(n, F(n), F(n+1))` as three ABI-encoded 32-byte words.
+The computation uses wrapping `u32` arithmetic.
 
-> **A complete template for building zero-knowledge applications on Starknet using SP1 zkVM**
-> 
-> **🔗 Based on the [SP1 Project Template](https://github.com/succinctlabs/sp1-project-template) with Starknet-specific integration**
+## Compatibility
 
-This template demonstrates how to create an end-to-end [SP1](https://github.com/succinctlabs/sp1) project that generates proofs of RISC-V program execution and verifies them on Starknet. It includes a Fibonacci computation example with complete proof generation and on-chain verification.
+The pinned SDK is **SP1 6.10.0**, which uses circuit **v6.1.0**.
+The template requires SHA-256 receipts with 96 public-value bytes.
+Blake3 receipts and SP1 v4/v5 receipts are incompatible.
 
-## 🏗️ Architecture
+`integration.json` records the integration versions and expected verifier class hashes.
+Rust and Cairo dependencies pin an immutable Garaga commit from [Garaga PR #589](https://github.com/keep-starknet-strange/garaga/pull/589).
+The published Garaga `1.1.0` package does not identify this integration reliably.
+After a compatible release, update both dependency manifests and lockfiles together.
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SP1 Program   │───▶│  Proof Scripts  │───▶│ Starknet Verif. │
-│   (Rust/RISC-V) │    │   (Groth16)     │    │   (Cairo)       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+## Install
 
-- **SP1 Program**: Rust program that computes Fibonacci numbers in the zkVM
-- **Proof Scripts**: Generate and format proofs for Starknet verification ([detailed docs](script/README.md))
-- **Starknet Contract**: Cairo smart contract that verifies SP1 proofs on-chain ([detailed docs](contracts/README.md))
+Install Rust through rustup, Docker for reproducible guest builds and local Groth16 proofs, and a protobuf compiler (`apt install protobuf-compiler` on Debian).
+Install `uv` for the integration and devnet scripts.
+The repository pins Rust 1.91.1.
+The guest build uses the official SP1 Docker image with an immutable digest.
+A local SP1 compiler installation is unnecessary for the normal Cargo commands.
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- [Rust](https://rustup.rs/) (latest stable)
-- [SP1 Toolchain](https://docs.succinct.xyz/docs/sp1/getting-started/install)
-- [Starknet Toolchain](https://github.com/software-mansion/starkup) (Scarb + Starknet Foundry)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/feltroidprime/sp1-starknet-template.git
-   cd sp1-starknet-template
-   ```
-
-2. **Install SP1**
-   ```bash
-   curl -L https://sp1.succinct.xyz | bash
-   sp1up
-   ```
-
-3. **Install Starknet toolchain**
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.starkup.sh | sh
-   ```
-
-## 📖 Usage
-
-### Quick Test Workflow
+If you need the standalone `cargo prove` CLI, install the pinned toolchain:
 
 ```bash
-# 1. Test program execution (fast)
-cd script && cargo run --release -- --execute --n 10
-
-# 2. Extract verification key
-cargo run --release --bin vkey
-
-# 3. Update contract with your verification key (see contracts/README.md)
-
-# 4. Generate Starknet proof
-cargo run --release --bin starknet -- --system groth16 --n 10
-
-# 5. Test on-chain verification
-cd ../contracts && snforge test
+bash scripts/install-sp1.sh
+export PATH="$HOME/.sp1/bin:$PATH"
 ```
 
-For detailed usage instructions:
-- **Proof Generation**: See [script/README.md](script/README.md)
-- **Contract Integration**: See [contracts/README.md](contracts/README.md)
+Install Scarb 2.21.0 and Starknet Foundry 0.64.1.
+Foundry requires Universal Sierra Compiler 2.10.0 or newer.
 
-## 📁 Project Structure
+## Verify the stored receipt
 
-```
-├── program/              # SP1 program (Rust/RISC-V)
-│   └── src/main.rs      # Fibonacci computation logic
-├── script/              # Proof generation scripts
-│   ├── README.md        # 📚 Detailed script documentation
-│   └── src/bin/         # Proof generation binaries
-├── contracts/           # Starknet smart contracts (Cairo)
-│   ├── README.md        # 📚 Detailed contract documentation
-│   ├── src/lib.cairo    # Main verification contract
-│   └── tests/           # Contract tests
-├── lib/                 # Shared library
-│   └── src/lib.rs       # Common types and utilities
-└── .github/workflows/   # CI/CD configuration
-```
-
-## 🧪 Example: Fibonacci Computation
-
-This template includes a complete example that:
-
-1. **Computes Fibonacci numbers** in the SP1 zkVM
-2. **Generates a zero-knowledge proof** of the computation
-3. **Verifies the proof on Starknet** using a Cairo smart contract
-
-The program takes an input `n` and computes the `n-1`th and `n`th Fibonacci numbers, proving the computation was done correctly without revealing the intermediate steps.
-
-## 🌐 Production Deployment
-
-### Using the Prover Network
-
-For production use or complex computations, use the [Succinct Prover Network](https://docs.succinct.xyz/docs/network/introduction):
+These commands compile the guest and verify the committed receipt.
+They do not generate a proof or require a public Starknet RPC endpoint.
+The first run downloads compiler dependencies and the guest build image.
 
 ```bash
-cp .env.example .env
-# Edit .env with your network private key
-SP1_PROVER=network NETWORK_PRIVATE_KEY=your_key cargo run --release --bin starknet
+cargo test --release --locked --workspace --exclude fibonacci-program
+cargo run --release --locked --bin fibonacci -- --execute --n 10
+uv run --no-project python scripts/check-integration.py
+cd contracts
+snforge test
 ```
 
-### Hardware Requirements
+The Rust test derives the program key from the compiled guest.
+It compares this key with the stored receipt and verifies the receipt with the official SDK verifier.
+It also checks the public outputs, Garaga calldata, and rejection of altered receipts.
+The Cairo tests declare both verifier classes locally and exercise the application contract.
+CI runs these checks without repeated proof generation.
 
-| Operation | RAM | Time | Documentation |
-|-----------|-----|------|---------------|
-| Execution | 1GB | Seconds | [script/README.md](script/README.md#performance-considerations) |
-| Core Proof | 4GB | Minutes | [script/README.md](script/README.md#performance-considerations) |
-| Groth16 Proof | 16GB | 10-30 min | [SP1 hardware requirements](https://docs.succinct.xyz/docs/sp1/getting-started/hardware-requirements#local-proving) |
+## Generate a new receipt
 
-## 🔍 Testing
-
-Run the complete test suite:
+Generate a receipt only after a guest change or when another input is necessary.
+Local Groth16 proof generation requires Docker and substantial memory.
+The first local proof also needs a roughly 6.2 GB parameter archive, plus space for extraction.
+The generator prepares these parameters before it starts the expensive computation.
 
 ```bash
-# Test SP1 program execution
-cd script && cargo run --release -- --execute
-
-# Test proof generation  
-cargo run --release -- --prove
-
-# Test Starknet contract
-cd ../contracts && snforge test
+SP1_PROVER=cpu cargo run --release --locked --bin starknet -- --n 3
+cargo test --release --locked --workspace --exclude fibonacci-program
+(cd contracts && snforge test)
 ```
 
-See component-specific testing documentation:
-- [Script Testing](script/README.md#testing-and-validation)
-- [Contract Testing](contracts/README.md#testing)
+The generator verifies the receipt before it replaces the JSON and calldata files.
+The receipt records its SDK version, circuit version, and guest ELF SHA-256.
+The committed contract test expects input `3` and outputs `(2, 3)`.
+Update that test if you change the fixture input.
+Mock receipts cannot pass the independent verification tests.
 
-## 🆘 Troubleshooting
+For the Succinct network, compile with `--features network` and configure `.env`.
+Network proof requests can incur charges.
+See [script instructions](script/README.md) for the commands.
 
-### Common Issues
+## Deploy
 
-- **"failed to generate proof"**: Check [script debugging guide](script/README.md#debugging)
-- **"Wrong program" error**: See [contract configuration](contracts/README.md#configuration)
-- **Hardware requirements**: Check [performance considerations](script/README.md#performance-considerations)
+The application constructor accepts an immutable verifier class hash and an immutable program verification key.
+The verifier performs the cryptographic check before the application compares the program key.
+The entry point returns `Result<Span<u256>, felt252>`.
+Malformed proofs can revert.
 
-## 📚 Resources
+As of October 31, 2026, RPC reads found neither new verifier class on Mainnet or Sepolia.
+Both calls returned `Class hash not found`.
+The older published verifier classes cannot verify these receipts.
+Explicit declarations of both new classes are necessary before live deployment.
+The Garaga release pipeline checks class availability but does not submit declarations.
+No live transaction forms part of the tests or CI.
+See [contract instructions](contracts/README.md) for local deployment and declaration commands.
 
-- [SP1 Documentation](https://docs.succinct.xyz/)
-- [Starknet Documentation](https://docs.starknet.io/)
-- [Garaga Repository](https://github.com/keep-starknet-strange/garaga)
-- [Cairo Book](https://book.cairo-lang.org/)
+## Dependency audit
 
-## 🆘 Support
+The pinned SDK has four upstream advisories in its lockfile.
+One affects the default native graph; three concern the optional network compression dependencies.
+See [the audit notes](SECURITY.md) for scope, dependency paths, and correction constraints.
 
-- **SP1 Issues**: [SP1 GitHub Issues](https://github.com/succinctlabs/sp1/issues)
-- **Template Issues**: [Create an issue](https://github.com/feltroidprime/sp1-starknet-template/issues)
-- **Garaga Support**: [Garaga Support](https://garaga.gitbook.io/garaga/support)
-- **Starknet Support**: [Starknet Support](https://www.starknet.io/online-communities/)
+## Layout
 
-## 📄 License
+- `program/`: SP1 guest.
+- `lib/`: Fibonacci computation and public-value ABI.
+- `script/`: execution, proof generation, key extraction, and receipt verification.
+- `contracts/`: application and offline Cairo tests.
+- `contracts/verifier/`: unmodified verifier source from the pinned Garaga commit.
+- `contracts/src/fixtures/`: committed receipt and derived calldata.
 
-This project is licensed under the MIT License - see the [LICENSE-MIT](LICENSE-MIT) file for details.
+The verifier source carries the Garaga MIT license.
+`scripts/check-integration.py` compares it with the pinned upstream source.
 
----
-
-**Built with ❤️ using [SP1](https://github.com/succinctlabs/sp1), [Garaga](https://github.com/keep-starknet-strange/garaga) and [Starknet](https://starknet.io/)**
-
----
-
-**Based on the [SP1 Project Template](https://github.com/succinctlabs/sp1-project-template) by [Succinct Labs](https://github.com/succinctlabs) • Starknet integration by [feltroidprime](https://github.com/feltroidprime)**
+[MIT license](LICENSE-MIT)

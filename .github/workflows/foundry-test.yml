@@ -1,19 +1,35 @@
-name: Foundry Test
+name: Offline Cairo verification
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
+    name: Cairo and isolated devnet
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Starknet Foundry
-        uses: foundry-rs/setup-snfoundry@v4
-      - name: Setup Scarb
-        uses: software-mansion/setup-scarb@v1
+      - uses: actions/checkout@v7.0.1
+      - uses: software-mansion/setup-scarb@v1.6.2
         with:
-          scarb-lock: ./contracts/Scarb.lock
-      - name: Run snforge test in contracts
+          scarb-version: "2.21.0"
+      - uses: foundry-rs/setup-snfoundry@v6.0.0
+        with:
+          starknet-foundry-version: "0.64.1"
+      - name: Integration pin and vendored verifier
+        run: python3 scripts/check-integration.py
+      - name: Format
+        working-directory: contracts
+        run: scarb fmt --check
+      - name: Local verifier, public outputs, and rejection tests
         working-directory: contracts
         run: snforge test
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Install devnet 0.10.1
+        run: |
+          curl --fail --location --retry 3 https://github.com/starknet-io/starknet-devnet/releases/download/v0.10.1/starknet-devnet-x86_64-unknown-linux-gnu.tar.gz -o /tmp/devnet.tar.gz
+          sudo tar -xzf /tmp/devnet.tar.gz -C /usr/local/bin
+      - name: Declare, deploy, and verify on isolated devnet
+        run: uv run --locked scripts/devnet.py
